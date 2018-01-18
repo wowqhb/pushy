@@ -286,6 +286,8 @@ public class ApnsClientTest extends AbstractClientServerTest {
 
             assertTrue("Clients must send notifications that conform to the APNs protocol specification.",
                     response.isAccepted());
+
+            assertNotNull(response.getApnsId());
         } finally {
             client.close().await();
             server.shutdown().await();
@@ -469,7 +471,7 @@ public class ApnsClientTest extends AbstractClientServerTest {
                 return new PushNotificationHandler() {
                     @Override
                     public void handlePushNotification(final Http2Headers headers, final ByteBuf payload) throws RejectedNotificationException {
-                        throw new UnregisteredDeviceTokenException(expiration, null);
+                        throw new UnregisteredDeviceTokenException(expiration);
                     }
                 };
             }
@@ -583,7 +585,7 @@ public class ApnsClientTest extends AbstractClientServerTest {
                 return new PushNotificationHandler() {
                     @Override
                     public void handlePushNotification(final Http2Headers headers, final ByteBuf payload) throws RejectedNotificationException {
-                        throw new RejectedNotificationException(RejectionReason.BAD_DEVICE_TOKEN, null);
+                        throw new RejectedNotificationException(RejectionReason.BAD_DEVICE_TOKEN);
                     }
                 };
             }
