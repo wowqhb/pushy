@@ -137,18 +137,6 @@ class MockApnsServerHandler extends Http2ConnectionHandler implements Http2Frame
         }
     }
 
-    private static class InternalServerErrorResponse {
-        private final int streamId;
-
-        InternalServerErrorResponse(final int streamId) {
-            this.streamId = streamId;
-        }
-
-        int getStreamId() {
-            return this.streamId;
-        }
-    }
-
     @SuppressWarnings("unused")
     private static class ErrorPayload {
         private final String reason;
@@ -279,7 +267,7 @@ class MockApnsServerHandler extends Http2ConnectionHandler implements Http2Frame
             this.write(context, new RejectNotificationResponse(stream.id(), e.getApnsId(), e.getRejectionReason(), deviceTokenExpirationTimestamp), writePromise);
             this.listener.handlePushNotificationRejected(headers, payload, e.getRejectionReason(), deviceTokenExpirationTimestamp);
         } catch (final Exception e) {
-            this.write(context, new InternalServerErrorResponse(stream.id()), writePromise);
+            this.write(context, new RejectNotificationResponse(stream.id(), null, RejectionReason.INTERNAL_SERVER_ERROR, null), writePromise);
             this.listener.handlePushNotificationRejected(headers, payload, RejectionReason.INTERNAL_SERVER_ERROR, null);
         } finally {
             if (stream.getProperty(this.payloadPropertyKey) != null) {
@@ -328,15 +316,6 @@ class MockApnsServerHandler extends Http2ConnectionHandler implements Http2Frame
             promiseCombiner.finish(writePromise);
 
             log.trace("Rejected push notification on stream {}: {}", rejectNotificationResponse.getStreamId(), rejectNotificationResponse.getErrorReason());
-        } else if (message instanceof InternalServerErrorResponse) {
-            final InternalServerErrorResponse internalServerErrorResponse = (InternalServerErrorResponse) message;
-
-            final Http2Headers headers = new DefaultHttp2Headers();
-            headers.status(HttpResponseStatus.INTERNAL_SERVER_ERROR.codeAsText());
-
-            this.encoder().writeHeaders(context, internalServerErrorResponse.getStreamId(), headers, 0, true, writePromise);
-
-            log.trace("Encountered an internal error on stream {}", internalServerErrorResponse.getStreamId());
         } else {
             context.write(message, writePromise);
         }
