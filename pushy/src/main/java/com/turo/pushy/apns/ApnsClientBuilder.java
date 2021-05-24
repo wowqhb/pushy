@@ -519,23 +519,25 @@ public class ApnsClientBuilder {
             throw new IllegalStateException("No APNs server address specified.");
         }
 
-        if (this.clientCertificate == null && this.privateKey == null && this.signingKey == null) {
-            throw new IllegalStateException("No client credentials specified; either TLS credentials (a " +
-                    "certificate/private key) or an APNs signing key must be provided before building a client.");
-        } else if ((this.clientCertificate != null || this.privateKey != null) && this.signingKey != null) {
-            throw new IllegalStateException("Clients may not have both a signing key and TLS credentials.");
-        } else if(this.sslContext != null && ((this.clientCertificate != null && this.privateKey != null) ||
-                                                             this.trustedServerCertificatePemFile != null ||
-                                                         this.trustedServerCertificateInputStream != null ||
-                                                         this.trustedServerCertificates != null )) {
-            throw new IllegalStateException("Should not set both SSL context and TLS credentials.");
-        }
-
         final SslContext sslContext;
         {
             if(this.sslContext != null) {
+                if((this.clientCertificate != null && this.privateKey != null) ||
+                        this.trustedServerCertificatePemFile != null ||
+                        this.trustedServerCertificateInputStream != null ||
+                        this.trustedServerCertificates != null ) {
+                    throw new IllegalStateException("Should not set both SSL context and TLS credentials.");
+                }
+
                 sslContext = this.sslContext;
             } else {
+                if (this.clientCertificate == null && this.privateKey == null && this.signingKey == null) {
+                    throw new IllegalStateException("No client credentials specified; either TLS credentials (a " +
+                            "certificate/private key) or an APNs signing key must be provided before building a client.");
+                } else if ((this.clientCertificate != null || this.privateKey != null) && this.signingKey != null) {
+                    throw new IllegalStateException("Clients may not have both a signing key and TLS credentials.");
+                }
+
                 final SslProvider sslProvider = SslUtil.getSslProvider();
 
                 final SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
