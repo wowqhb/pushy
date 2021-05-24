@@ -63,6 +63,8 @@ public class ApnsClientBuilder {
 
     private ApnsSigningKey signingKey;
 
+    private SslContext sslContext;
+
     private File trustedServerCertificatePemFile;
     private InputStream trustedServerCertificateInputStream;
     private X509Certificate[] trustedServerCertificates;
@@ -275,6 +277,18 @@ public class ApnsClientBuilder {
      */
     public ApnsClientBuilder setSigningKey(final ApnsSigningKey signingKey) {
         this.signingKey = signingKey;
+
+        return this;
+    }
+
+    /**
+     * <p>Sets SSL context for the client under construction. If not set, an instance of SSL context build using TLS
+     * parameters will be used</p>
+     * @param sslContext externally created SSL context
+     * @return a reference to this builder
+     */
+    public ApnsClientBuilder setSslContext(final SslContext sslContext) {
+        this.sslContext = sslContext;
 
         return this;
     }
@@ -510,34 +524,43 @@ public class ApnsClientBuilder {
                     "certificate/private key) or an APNs signing key must be provided before building a client.");
         } else if ((this.clientCertificate != null || this.privateKey != null) && this.signingKey != null) {
             throw new IllegalStateException("Clients may not have both a signing key and TLS credentials.");
+        } else if(this.sslContext != null && ((this.clientCertificate != null && this.privateKey != null) ||
+                                                             this.trustedServerCertificatePemFile != null ||
+                                                         this.trustedServerCertificateInputStream != null ||
+                                                         this.trustedServerCertificates != null )) {
+            throw new IllegalStateException("Should not set both SSL context and TLS credentials.");
         }
 
         final SslContext sslContext;
         {
-            final SslProvider sslProvider = SslUtil.getSslProvider();
+            if(this.sslContext != null) {
+                sslContext = this.sslContext;
+            } else {
+                final SslProvider sslProvider = SslUtil.getSslProvider();
 
-            final SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
-                    .sslProvider(sslProvider)
-                    .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
-                    .applicationProtocolConfig(
-                            new ApplicationProtocolConfig(Protocol.ALPN,
-                                    SelectorFailureBehavior.NO_ADVERTISE,
-                                    SelectedListenerFailureBehavior.ACCEPT,
-                                    ApplicationProtocolNames.HTTP_2));
+                final SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
+                        .sslProvider(sslProvider)
+                        .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+                        .applicationProtocolConfig(
+                                new ApplicationProtocolConfig(Protocol.ALPN,
+                                        SelectorFailureBehavior.NO_ADVERTISE,
+                                        SelectedListenerFailureBehavior.ACCEPT,
+                                        ApplicationProtocolNames.HTTP_2));
 
-            if (this.clientCertificate != null && this.privateKey != null) {
-                sslContextBuilder.keyManager(this.privateKey, this.privateKeyPassword, this.clientCertificate);
+                if (this.clientCertificate != null && this.privateKey != null) {
+                    sslContextBuilder.keyManager(this.privateKey, this.privateKeyPassword, this.clientCertificate);
+                }
+
+                if (this.trustedServerCertificatePemFile != null) {
+                    sslContextBuilder.trustManager(this.trustedServerCertificatePemFile);
+                } else if (this.trustedServerCertificateInputStream != null) {
+                    sslContextBuilder.trustManager(this.trustedServerCertificateInputStream);
+                } else if (this.trustedServerCertificates != null) {
+                    sslContextBuilder.trustManager(this.trustedServerCertificates);
+                }
+
+                sslContext = sslContextBuilder.build();
             }
-
-            if (this.trustedServerCertificatePemFile != null) {
-                sslContextBuilder.trustManager(this.trustedServerCertificatePemFile);
-            } else if (this.trustedServerCertificateInputStream != null) {
-                sslContextBuilder.trustManager(this.trustedServerCertificateInputStream);
-            } else if (this.trustedServerCertificates != null) {
-                sslContextBuilder.trustManager(this.trustedServerCertificates);
-            }
-
-            sslContext = sslContextBuilder.build();
         }
 
         final ApnsClient client = new ApnsClient(this.apnsServerAddress, sslContext, this.signingKey,
