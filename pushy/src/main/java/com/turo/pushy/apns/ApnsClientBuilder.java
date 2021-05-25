@@ -570,7 +570,7 @@ public class ApnsClientBuilder {
                 this.gracefulShutdownTimeoutMillis, this.concurrentConnections, this.metricsListener,
                 this.frameLogger, this.eventLoopGroup);
 
-        if (sslContext instanceof ReferenceCounted) {
+        if (this.sslContext == null && sslContext instanceof ReferenceCounted) {
             ((ReferenceCounted) sslContext).release();
         }
 
